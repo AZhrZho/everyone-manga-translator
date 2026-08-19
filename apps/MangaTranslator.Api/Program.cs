@@ -5,6 +5,7 @@ using MangaTranslator.Api.Projects;
 using MangaTranslator.Api.Pipeline;
 using MangaTranslator.Api.Storage;
 using MangaTranslator.Api.Settings;
+using MangaTranslator.Api.Infrastructure;
 using MangaTranslator.Contracts;
 using MangaTranslator.LocalDetection;
 using MangaTranslator.LocalDetection.Craft;
@@ -15,6 +16,17 @@ using Microsoft.AspNetCore.DataProtection;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
+var appDataPaths = new AppDataPaths();
+var fileLoggerProvider = new FileLoggerProvider(appDataPaths.LogsRoot);
+
+builder.Logging.AddProvider(fileLoggerProvider);
+var startupLogger = fileLoggerProvider.CreateLogger("MangaTranslator.Api.Startup");
+startupLogger.LogInformation(
+    "API process starting. Version={Version}; Environment={Environment}; UserDataRoot={UserDataRoot}; LogsRoot={LogsRoot}",
+    typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "unknown",
+    builder.Environment.EnvironmentName,
+    appDataPaths.UserDataRoot,
+    appDataPaths.LogsRoot);
 
 builder.Services.AddCors(options =>
 {
@@ -38,7 +50,6 @@ builder.Services.AddSignalR().AddJsonProtocol(options =>
     options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddHttpClient("workflow-model-provider", client =>
     client.Timeout = Timeout.InfiniteTimeSpan);
-var appDataPaths = new AppDataPaths();
 builder.Services.AddSingleton(appDataPaths);
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(appDataPaths.UserDataRoot, "protection-keys")))
@@ -104,7 +115,16 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<Transl
 builder.Services.AddSingleton<ExportJobService>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<ExportJobService>());
 
-var app = builder.Build();
+WebApplication app;
+try
+{
+    app = builder.Build();
+}
+catch (Exception exception)
+{
+    startupLogger.LogCritical(exception, "API host failed while building the application.");
+    throw;
+}
 app.UseCors();
 app.UseDefaultFiles();
 app.UseStaticFiles();
@@ -311,7 +331,15 @@ app.MapHub<JobEventsHub>("/hubs/jobs");
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapFallbackToFile("index.html");
 
-app.Run();
+try
+{
+    app.Run();
+}
+catch (Exception exception)
+{
+    startupLogger.LogCritical(exception, "API host failed during startup or shutdown.");
+    throw;
+}
 
 internal static class DemoProject
 {

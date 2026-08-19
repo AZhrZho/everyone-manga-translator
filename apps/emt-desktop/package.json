@@ -12,7 +12,8 @@
     "dev": "concurrently -k \"npm --prefix ../emt-client run dev -- --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron .\"",
     "dist:win": "electron-builder --win nsis --x64 --publish never",
     "install:electron": "node scripts/install-electron.mjs",
-    "start": "electron ."
+    "start": "electron .",
+    "test": "node --test logging.test.mjs"
   },
   "devDependencies": {
     "concurrently": "10.0.4",
@@ -32,6 +33,7 @@
     },
     "files": [
       "main.mjs",
+      "logging.mjs",
       "preload.cjs",
       "emt-logo.png",
       "package.json"

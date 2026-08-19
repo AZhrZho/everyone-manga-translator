@@ -140,6 +140,10 @@ models, then assign a model to each workflow stage. API keys are stored in the
 local application data directory using ASP.NET Core Data Protection; they must
 never be committed.
 
+If the application fails to start, include the logs when reporting the issue.
+On Windows they are stored in `%APPDATA%\EMT Studio\logs\desktop.log` and
+`%APPDATA%\EMT Studio\logs\api.log`.
+
 Detector weights are not committed to this repository. A locally built Windows
 installer bundles the verified models downloaded during the release build. For
 source-based development, install them in the application's local model

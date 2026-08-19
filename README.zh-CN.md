@@ -99,6 +99,8 @@ npm --prefix .\apps\emt-client run dev -- --host 127.0.0.1
 
 在应用中打开**设置**，添加服务提供方、接口地址、API 密钥与模型，然后为各工作流阶段指定模型。API 密钥通过 ASP.NET Core Data Protection 保存在本地应用数据目录中，禁止提交到仓库。
 
+如果应用启动失败，反馈问题时请一并附上日志。Windows 下日志位于 `%APPDATA%\EMT Studio\logs\desktop.log` 和 `%APPDATA%\EMT Studio\logs\api.log`。
+
 检测模型权重不会提交到本仓库。本地构建的 Windows 安装包会包含 Release 构建期间下载并通过校验的模型。使用源码开发时，请将模型安装到应用的本地模型目录，或设置以下环境变量：
 
 ```powershell

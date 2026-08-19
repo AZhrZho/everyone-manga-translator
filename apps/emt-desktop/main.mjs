@@ -3,6 +3,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { appendDesktopLog, formatError } from './logging.mjs'
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url))
 const apiProject = path.resolve(currentDirectory, '..', 'MangaTranslator.Api', 'MangaTranslator.Api.csproj')
@@ -10,6 +11,7 @@ const apiUrl = process.env.EMT_API_URL ?? 'http://127.0.0.1:5198'
 const clientUrl = process.env.EMT_CLIENT_URL ?? (app.isPackaged ? apiUrl : 'http://127.0.0.1:5173')
 const maximumLocalModelBytes = 512 * 1024 * 1024
 const localModelFiles = Object.freeze({ craft: 'craft.onnx' })
+const desktopLogFileName = 'desktop.log'
 let apiProcess
 let mainWindow
 let quitting = false
@@ -22,6 +24,28 @@ const desktopSmokeTest = process.env.EMT_DESKTOP_SMOKE_TEST === '1'
 const hasSingleInstanceLock = desktopSmokeTest || app.requestSingleInstanceLock()
 
 const ui = (zh, en) => uiLocale === 'en-US' ? en : zh
+
+function desktopLogPath() {
+  const configuredLogsRoot = process.env.EMT_LOGS_ROOT
+  if (configuredLogsRoot) return path.join(path.resolve(configuredLogsRoot), desktopLogFileName)
+  try {
+    return path.join(app.getPath('logs'), desktopLogFileName)
+  } catch {
+    const appData = process.env.APPDATA ?? currentDirectory
+    return path.join(appData, 'EMT Studio', 'logs', desktopLogFileName)
+  }
+}
+
+function writeDesktopLog(level, message, details) {
+  appendDesktopLog(desktopLogPath(), level, message, details)
+}
+
+process.on('uncaughtException', error => {
+  writeDesktopLog('ERROR', 'Uncaught Electron exception.', formatError(error))
+})
+process.on('unhandledRejection', reason => {
+  writeDesktopLog('ERROR', 'Unhandled Electron promise rejection.', formatError(reason))
+})
 
 function desktopPath(environmentName, electronPathName) {
   const configured = process.env[environmentName]
@@ -73,17 +97,37 @@ function startApi() {
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
+  writeDesktopLog('INFO', 'Starting local API.', {
+    command,
+    args,
+    packaged: app.isPackaged,
+    apiUrl,
+    logsRoot: desktopPath('EMT_LOGS_ROOT', 'logs'),
+  })
   apiProcess.on('error', error => {
+    writeDesktopLog('ERROR', 'Failed to start local API.', formatError(error))
     console.error(`[api] Failed to start ${command}:`, error)
   })
-  apiProcess.stdout.on('data', data => console.info(`[api] ${data}`))
-  apiProcess.stderr.on('data', data => console.error(`[api] ${data}`))
-  apiProcess.on('exit', code => {
+  apiProcess.stdout.on('data', data => {
+    const text = data.toString().trimEnd()
+    writeDesktopLog('INFO', 'API stdout.', { text })
+    console.info(`[api] ${data}`)
+  })
+  apiProcess.stderr.on('data', data => {
+    const text = data.toString().trimEnd()
+    writeDesktopLog('ERROR', 'API stderr.', { text })
+    console.error(`[api] ${data}`)
+  })
+  apiProcess.on('exit', (code, signal) => {
+    writeDesktopLog(code === 0 || quitting ? 'INFO' : 'ERROR', 'Local API exited.', { code, signal })
     if (!quitting && code !== 0) {
       const alertOptions = {
         kind: 'alert',
         title: ui('EMT 服务已停止', 'EMT service stopped'),
-        message: ui(`本地服务异常退出，代码 ${code ?? 'unknown'}。`, `The local service exited unexpectedly with code ${code ?? 'unknown'}.`),
+        message: ui(
+          `本地服务异常退出，代码 ${code ?? 'unknown'}。\n日志：${desktopLogPath()}`,
+          `The local service exited unexpectedly with code ${code ?? 'unknown'}.\nLog: ${desktopLogPath()}`,
+        ),
         confirmLabel: ui('知道了', 'OK'),
         cancelLabel: ui('关闭', 'Close'),
       }
@@ -161,6 +205,12 @@ async function waitForApi() {
 }
 
 async function createWindow() {
+  writeDesktopLog('INFO', 'Creating desktop window.', {
+    packaged: app.isPackaged,
+    platform: process.platform,
+    electron: process.versions.electron,
+    node: process.versions.node,
+  })
   uiLocale = app.getLocale().toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US'
   installBundledLocalModels()
   startApi()
@@ -187,6 +237,12 @@ async function createWindow() {
     },
   })
   mainWindow.once('ready-to-show', () => mainWindow?.show())
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    writeDesktopLog('ERROR', 'Renderer failed to load.', { errorCode, errorDescription, validatedURL })
+  })
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    writeDesktopLog('ERROR', 'Renderer process exited.', details)
+  })
   mainWindow.on('maximize', () => mainWindow?.webContents.send('emt:window-state', { maximized: true }))
   mainWindow.on('unmaximize', () => mainWindow?.webContents.send('emt:window-state', { maximized: false }))
   mainWindow.on('close', event => {
@@ -204,6 +260,7 @@ async function createWindow() {
     throw new Error('Electron preload bridge was not exposed to the renderer.')
   }
   console.info(`[desktop] Renderer host bridge: ${rendererHostKind}`)
+  writeDesktopLog('INFO', 'Renderer host bridge ready.', { rendererHostKind, clientUrl })
   if (process.env.EMT_DESKTOP_SMOKE_TEST === '1') {
     quitting = true
     mainWindow.destroy()
@@ -396,10 +453,19 @@ ipcMain.handle('emt:set-locale', (_event, locale) => { uiLocale = locale === 'en
 
 if (hasSingleInstanceLock) {
   app.whenReady().then(createWindow).catch(error => {
-    dialog.showErrorBox(ui('EMT 启动失败', 'EMT failed to start'), error instanceof Error ? error.message : String(error))
+    writeDesktopLog('ERROR', 'EMT failed to start.', formatError(error))
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    dialog.showErrorBox(
+      ui('EMT 启动失败', 'EMT failed to start'),
+      `${errorMessage}\n\n${ui('日志', 'Log')}: ${desktopLogPath()}`,
+    )
     app.quit()
   })
 }
+
+app.on('child-process-gone', (_event, details) => {
+  writeDesktopLog('ERROR', 'Electron child process exited.', details)
+})
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
@@ -416,5 +482,6 @@ app.on('before-quit', event => {
   }
 
   quitting = true
+  writeDesktopLog('INFO', 'Electron application is quitting.')
   stopApi()
 })
