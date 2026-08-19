@@ -1,5 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
+const apiBaseUrlArgument = process.argv.find(argument => argument.startsWith('--emt-api-url='))
+const apiBaseUrl = apiBaseUrlArgument?.slice('--emt-api-url='.length) ?? ''
+
 let beforeCloseHandler = async () => true
 let windowStateHandler = () => undefined
 let dialogHandler = async () => false
@@ -31,6 +34,7 @@ ipcRenderer.on('emt:dialog-request', async (_event, requestId, request) => {
 contextBridge.exposeInMainWorld('emtHost', Object.freeze({
   kind: 'desktop',
   platform: process.platform,
+  apiBaseUrl,
   versions: process.versions,
   selectImportFolder: () => ipcRenderer.invoke('emt:select-import-folder'),
   selectImportPdf: () => ipcRenderer.invoke('emt:select-import-pdf'),

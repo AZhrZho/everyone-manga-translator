@@ -3,16 +3,17 @@ import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { dynamicApiListenUrl, parseApiReadyAddress } from './api-launch.mjs'
 import { appendDesktopLog, formatError } from './logging.mjs'
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url))
 const apiProject = path.resolve(currentDirectory, '..', 'MangaTranslator.Api', 'MangaTranslator.Api.csproj')
-const apiUrl = process.env.EMT_API_URL ?? 'http://127.0.0.1:5198'
-const clientUrl = process.env.EMT_CLIENT_URL ?? (app.isPackaged ? apiUrl : 'http://127.0.0.1:5173')
 const maximumLocalModelBytes = 512 * 1024 * 1024
 const localModelFiles = Object.freeze({ craft: 'craft.onnx' })
 const desktopLogFileName = 'desktop.log'
+const apiStartupTimeoutMilliseconds = 20000
 let apiProcess
+let apiUrl
 let mainWindow
 let quitting = false
 let closeDialogInFlight = false
@@ -20,8 +21,6 @@ let closeRequestSequence = 0
 let dialogRequestSequence = 0
 let uiLocale = 'zh-CN'
 let initialTheme = 'light'
-const desktopSmokeTest = process.env.EMT_DESKTOP_SMOKE_TEST === '1'
-const hasSingleInstanceLock = desktopSmokeTest || app.requestSingleInstanceLock()
 
 const ui = (zh, en) => uiLocale === 'en-US' ? en : zh
 
@@ -64,17 +63,6 @@ async function refreshDesktopPreferences() {
   }
 }
 
-if (!hasSingleInstanceLock) {
-  app.quit()
-} else {
-  app.on('second-instance', () => {
-    if (!mainWindow) return
-    if (mainWindow.isMinimized()) mainWindow.restore()
-    mainWindow.show()
-    mainWindow.focus()
-  })
-}
-
 function startApi() {
   const command = app.isPackaged
     ? path.join(process.resourcesPath, 'api', 'MangaTranslator.Api.exe')
@@ -83,12 +71,13 @@ function startApi() {
   const args = app.isPackaged
     ? []
     : ['run', '--project', apiProject, '--no-launch-profile', '--no-restore']
-  apiProcess = spawn(command, args, {
+  const requestedApiUrl = process.env.EMT_API_URL ?? dynamicApiListenUrl
+  const startedProcess = spawn(command, args, {
     windowsHide: true,
     cwd: app.isPackaged ? path.dirname(command) : currentDirectory,
     env: {
       ...process.env,
-      ASPNETCORE_URLS: apiUrl,
+      ASPNETCORE_URLS: requestedApiUrl,
       EMT_HOST_KIND: 'desktop',
       EMT_USER_DATA_ROOT: desktopPath('EMT_USER_DATA_ROOT', 'userData'),
       EMT_CACHE_ROOT: desktopPath('EMT_CACHE_ROOT', 'cache'),
@@ -97,44 +86,77 @@ function startApi() {
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
+  apiProcess = startedProcess
   writeDesktopLog('INFO', 'Starting local API.', {
     command,
     args,
     packaged: app.isPackaged,
-    apiUrl,
+    requestedApiUrl,
+    processId: startedProcess.pid,
     logsRoot: desktopPath('EMT_LOGS_ROOT', 'logs'),
   })
-  apiProcess.on('error', error => {
-    writeDesktopLog('ERROR', 'Failed to start local API.', formatError(error))
-    console.error(`[api] Failed to start ${command}:`, error)
-  })
-  apiProcess.stdout.on('data', data => {
-    const text = data.toString().trimEnd()
-    writeDesktopLog('INFO', 'API stdout.', { text })
-    console.info(`[api] ${data}`)
-  })
-  apiProcess.stderr.on('data', data => {
-    const text = data.toString().trimEnd()
-    writeDesktopLog('ERROR', 'API stderr.', { text })
-    console.error(`[api] ${data}`)
-  })
-  apiProcess.on('exit', (code, signal) => {
-    writeDesktopLog(code === 0 || quitting ? 'INFO' : 'ERROR', 'Local API exited.', { code, signal })
-    if (!quitting && code !== 0) {
-      const alertOptions = {
-        kind: 'alert',
-        title: ui('EMT 服务已停止', 'EMT service stopped'),
-        message: ui(
-          `本地服务异常退出，代码 ${code ?? 'unknown'}。\n日志：${desktopLogPath()}`,
-          `The local service exited unexpectedly with code ${code ?? 'unknown'}.\nLog: ${desktopLogPath()}`,
-        ),
-        confirmLabel: ui('知道了', 'OK'),
-        cancelLabel: ui('关闭', 'Close'),
-      }
-      void requestRendererDialog(alertOptions).then(result => {
-        if (result === null) void dialog.showErrorBox(alertOptions.title, alertOptions.message)
-      })
+  return new Promise((resolve, reject) => {
+    let ready = false
+    let standardOutput = ''
+    const timeout = setTimeout(() => {
+      reject(new Error(ui('本地服务未能报告监听地址。', 'The local service did not report its listening address.')))
+    }, apiStartupTimeoutMilliseconds)
+    const rejectStartup = error => {
+      if (ready) return
+      clearTimeout(timeout)
+      reject(error)
     }
+
+    startedProcess.on('error', error => {
+      writeDesktopLog('ERROR', 'Failed to start local API.', formatError(error))
+      console.error(`[api] Failed to start ${command}:`, error)
+      rejectStartup(error)
+    })
+    startedProcess.stdout.on('data', data => {
+      const chunk = data.toString()
+      const text = chunk.trimEnd()
+      standardOutput = `${standardOutput}${chunk}`.slice(-8192)
+      writeDesktopLog('INFO', 'API stdout.', { text })
+      console.info(`[api] ${data}`)
+      if (ready) return
+      const boundAddress = parseApiReadyAddress(standardOutput)
+      if (!boundAddress) return
+      ready = true
+      clearTimeout(timeout)
+      writeDesktopLog('INFO', 'Local API is ready.', { apiUrl: boundAddress, processId: startedProcess.pid })
+      resolve(boundAddress)
+    })
+    startedProcess.stderr.on('data', data => {
+      const text = data.toString().trimEnd()
+      writeDesktopLog('ERROR', 'API stderr.', { text })
+      console.error(`[api] ${data}`)
+    })
+    startedProcess.on('exit', (code, signal) => {
+      clearTimeout(timeout)
+      writeDesktopLog(code === 0 || quitting ? 'INFO' : 'ERROR', 'Local API exited.', { code, signal })
+      if (!ready) {
+        rejectStartup(new Error(ui(
+          `本地服务在启动完成前退出，代码 ${code ?? 'unknown'}。`,
+          `The local service exited before startup completed with code ${code ?? 'unknown'}.`,
+        )))
+        return
+      }
+      if (!quitting && code !== 0) {
+        const alertOptions = {
+          kind: 'alert',
+          title: ui('EMT 服务已停止', 'EMT service stopped'),
+          message: ui(
+            `本地服务异常退出，代码 ${code ?? 'unknown'}。\n日志：${desktopLogPath()}`,
+            `The local service exited unexpectedly with code ${code ?? 'unknown'}.\nLog: ${desktopLogPath()}`,
+          ),
+          confirmLabel: ui('知道了', 'OK'),
+          cancelLabel: ui('关闭', 'Close'),
+        }
+        void requestRendererDialog(alertOptions).then(result => {
+          if (result === null) void dialog.showErrorBox(alertOptions.title, alertOptions.message)
+        })
+      }
+    })
   })
 }
 
@@ -148,8 +170,18 @@ function installBundledLocalModels() {
     const destination = path.join(installedModelsDirectory, modelFileName)
     if (!fs.existsSync(source) || fs.existsSync(destination)) continue
     fs.mkdirSync(installedModelsDirectory, { recursive: true })
-    fs.copyFileSync(source, destination)
-    console.info(`[desktop] Installed local model: ${destination}`)
+    const temporaryDestination = `${destination}.${process.pid}.tmp`
+    try {
+      fs.copyFileSync(source, temporaryDestination)
+      try {
+        fs.renameSync(temporaryDestination, destination)
+        console.info(`[desktop] Installed local model: ${destination}`)
+      } catch (error) {
+        if (!fs.existsSync(destination)) throw error
+      }
+    } finally {
+      fs.rmSync(temporaryDestination, { force: true })
+    }
   }
 }
 
@@ -191,10 +223,10 @@ function stopApi() {
   apiProcess = undefined
 }
 
-async function waitForApi() {
+async function waitForApi(boundApiUrl) {
   for (let attempt = 0; attempt < 80; attempt += 1) {
     try {
-      const response = await fetch(`${apiUrl}/health`)
+      const response = await fetch(`${boundApiUrl}/health`)
       if (response.ok) return
     } catch {
       // Service is still starting.
@@ -213,10 +245,11 @@ async function createWindow() {
   })
   uiLocale = app.getLocale().toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US'
   installBundledLocalModels()
-  startApi()
-  await waitForApi()
+  apiUrl = await startApi()
+  await waitForApi(apiUrl)
   await refreshDesktopPreferences()
   Menu.setApplicationMenu(null)
+  const clientUrl = process.env.EMT_CLIENT_URL ?? (app.isPackaged ? apiUrl : 'http://127.0.0.1:5173')
   mainWindow = new BrowserWindow({
     title: 'EMT Studio',
     width: 1440,
@@ -234,6 +267,7 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      additionalArguments: [`--emt-api-url=${apiUrl}`],
     },
   })
   mainWindow.once('ready-to-show', () => mainWindow?.show())
@@ -451,17 +485,15 @@ ipcMain.handle('emt:window-close', () => { mainWindow?.close() })
 ipcMain.handle('emt:window-is-maximized', () => mainWindow?.isMaximized() ?? false)
 ipcMain.handle('emt:set-locale', (_event, locale) => { uiLocale = locale === 'en-US' ? 'en-US' : 'zh-CN' })
 
-if (hasSingleInstanceLock) {
-  app.whenReady().then(createWindow).catch(error => {
-    writeDesktopLog('ERROR', 'EMT failed to start.', formatError(error))
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    dialog.showErrorBox(
-      ui('EMT 启动失败', 'EMT failed to start'),
-      `${errorMessage}\n\n${ui('日志', 'Log')}: ${desktopLogPath()}`,
-    )
-    app.quit()
-  })
-}
+app.whenReady().then(createWindow).catch(error => {
+  writeDesktopLog('ERROR', 'EMT failed to start.', formatError(error))
+  const errorMessage = error instanceof Error ? error.message : String(error)
+  dialog.showErrorBox(
+    ui('EMT 启动失败', 'EMT failed to start'),
+    `${errorMessage}\n\n${ui('日志', 'Log')}: ${desktopLogPath()}`,
+  )
+  app.quit()
+})
 
 app.on('child-process-gone', (_event, details) => {
   writeDesktopLog('ERROR', 'Electron child process exited.', details)

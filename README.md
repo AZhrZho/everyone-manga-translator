@@ -120,8 +120,9 @@ Start the Electron development shell:
 npm --prefix .\apps\emt-desktop run dev
 ```
 
-The desktop host starts the local API at `http://127.0.0.1:5198` and the Vite
-client at `http://127.0.0.1:5173`.
+The desktop host asks Windows to assign an available loopback port to its local
+API, so installed instances do not depend on a fixed port and can run side by
+side. The Vite development client still runs at `http://127.0.0.1:5173`.
 
 To run the services separately:
 

@@ -34,7 +34,9 @@ export type ProjectSettingsInput = {
   precheckBatchConcurrency?: number
 }
 
-export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5198'
+export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
+  ?? window.emtHost?.apiBaseUrl
+  ?? 'http://127.0.0.1:5198'
 
 export class ApiRequestError extends Error {
   readonly method: string

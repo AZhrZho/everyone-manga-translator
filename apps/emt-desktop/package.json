@@ -1,7 +1,7 @@
 {
   "name": "emt-desktop",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Desktop-first manga translation workspace",
   "author": "EMT Studio contributors",
   "license": "AGPL-3.0-only",
@@ -13,7 +13,7 @@
     "dist:win": "electron-builder --win nsis --x64 --publish never",
     "install:electron": "node scripts/install-electron.mjs",
     "start": "electron .",
-    "test": "node --test logging.test.mjs"
+    "test": "node --test logging.test.mjs api-launch.test.mjs"
   },
   "devDependencies": {
     "concurrently": "10.0.4",
@@ -33,6 +33,7 @@
     },
     "files": [
       "main.mjs",
+      "api-launch.mjs",
       "logging.mjs",
       "preload.cjs",
       "emt-logo.png",

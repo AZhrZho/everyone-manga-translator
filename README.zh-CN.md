@@ -83,7 +83,7 @@ npm --prefix .\apps\emt-desktop run bootstrap
 npm --prefix .\apps\emt-desktop run dev
 ```
 
-桌面宿主会在 `http://127.0.0.1:5198` 启动本地 API，并在 `http://127.0.0.1:5173` 启动 Vite 客户端。
+桌面宿主会让 Windows 为本地 API 动态分配可用的回环端口，因此安装后的程序不依赖固定端口，并支持同时运行多个实例。Vite 开发客户端仍在 `http://127.0.0.1:5173` 启动。
 
 也可以分别运行两个服务：
 

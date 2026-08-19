@@ -13,6 +13,8 @@ using MangaTranslator.LocalDetection.Ctd;
 using MangaTranslator.ProjectSystem;
 using MangaTranslator.ProjectSystem.Local;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -140,7 +142,7 @@ app.MapGet("/api/system/info", (IHostEnvironment environment, AppDataPaths paths
 
     return new SystemInfoResponse(
         "EMT Studio",
-        typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "0.1.0",
+        typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "0.1.1",
         hostKind,
         Environment.Version.ToString(),
         paths.DataRoot);
@@ -333,7 +335,19 @@ app.MapFallbackToFile("index.html");
 
 try
 {
-    app.Run();
+    await app.StartAsync();
+    var addresses = app.Services
+        .GetRequiredService<IServer>()
+        .Features
+        .Get<IServerAddressesFeature>()?
+        .Addresses;
+    var apiAddress = addresses?
+        .Select(address => Uri.TryCreate(address, UriKind.Absolute, out var uri) ? uri : null)
+        .FirstOrDefault(uri => uri is not null && uri.Scheme == Uri.UriSchemeHttp)
+        ?? throw new InvalidOperationException("API started without an HTTP listening address.");
+    Console.Out.WriteLine($"EMT_API_READY={apiAddress.GetLeftPart(UriPartial.Authority)}");
+    await Console.Out.FlushAsync();
+    await app.WaitForShutdownAsync();
 }
 catch (Exception exception)
 {

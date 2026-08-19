@@ -115,21 +115,11 @@ function Test-PackagedApi {
 
     $smokeRoot = Join-Path $stagingDirectory 'installed-environment-smoke'
     Reset-GeneratedDirectory $smokeRoot
-    $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
-    $listener.Start()
-    try {
-        $port = ([Net.IPEndPoint]$listener.LocalEndpoint).Port
-    }
-    finally {
-        $listener.Stop()
-    }
-
-    $baseUrl = "http://127.0.0.1:$port"
     $standardOutput = Join-Path $smokeRoot 'api.stdout.log'
     $standardError = Join-Path $smokeRoot 'api.stderr.log'
     $apiExecutable = Join-Path $PublishedApiDirectory 'MangaTranslator.Api.exe'
     $processEnvironment = @{
-        ASPNETCORE_URLS = $baseUrl
+        ASPNETCORE_URLS = 'http://127.0.0.1:0'
         EMT_HOST_KIND = 'desktop'
         EMT_USER_DATA_ROOT = (Join-Path $smokeRoot 'user-data')
         EMT_CACHE_ROOT = (Join-Path $smokeRoot 'cache')
@@ -149,7 +139,7 @@ function Test-PackagedApi {
         -PassThru
 
     try {
-        $health = $null
+        $baseUrl = $null
         for ($attempt = 1; $attempt -le 80; $attempt++) {
             if ($process.HasExited) {
                 $errorText = if (Test-Path -LiteralPath $standardError) {
@@ -157,13 +147,29 @@ function Test-PackagedApi {
                 } else { '' }
                 throw "Published API exited with code $($process.ExitCode). $errorText"
             }
-            try {
-                $health = Invoke-RestMethod -Uri "$baseUrl/health" -TimeoutSec 2
-                break
+            if (Test-Path -LiteralPath $standardOutput) {
+                # A redirected stream can create the file before its first bytes are
+                # flushed; Get-Content may therefore return $null for an empty file.
+                # [regex]::Match requires a non-null input string.
+                $outputText = [string](Get-Content -LiteralPath $standardOutput -Raw)
+                $readyMatch = [regex]::Match(
+                    $outputText,
+                    '(?m)^EMT_API_READY=(http://127\.0\.0\.1:\d+)\r?$')
+                if ($readyMatch.Success) {
+                    $baseUrl = $readyMatch.Groups[1].Value
+                    break
+                }
             }
-            catch {
-                Start-Sleep -Milliseconds 250
-            }
+            Start-Sleep -Milliseconds 250
+        }
+        if ([string]::IsNullOrWhiteSpace($baseUrl)) {
+            throw 'Published API did not report its dynamically assigned listening address.'
+        }
+        try {
+            $health = Invoke-RestMethod -Uri "$baseUrl/health" -TimeoutSec 5
+        }
+        catch {
+            throw "Published API failed its dynamic-port health check at $baseUrl. $($_.Exception.Message)"
         }
         if ($null -eq $health -or $health.status -ne 'ok') {
             throw 'Published API did not pass its health check.'
@@ -197,20 +203,8 @@ function Test-PackagedDesktop {
 
     $smokeRoot = Join-Path $stagingDirectory 'desktop-smoke'
     Reset-GeneratedDirectory $smokeRoot
-    $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
-    $listener.Start()
-    try {
-        $port = ([Net.IPEndPoint]$listener.LocalEndpoint).Port
-    }
-    finally {
-        $listener.Stop()
-    }
-
-    $standardOutput = Join-Path $smokeRoot 'desktop.stdout.log'
-    $standardError = Join-Path $smokeRoot 'desktop.stderr.log'
     $processEnvironment = @{
         EMT_DESKTOP_SMOKE_TEST = '1'
-        EMT_API_URL = "http://127.0.0.1:$port"
         EMT_USER_DATA_ROOT = (Join-Path $smokeRoot 'user-data')
         EMT_CACHE_ROOT = (Join-Path $smokeRoot 'cache')
         EMT_LOGS_ROOT = (Join-Path $smokeRoot 'logs')
@@ -218,28 +212,51 @@ function Test-PackagedDesktop {
         MANGA_TRANSLATOR_FONT_LIBRARY = $null
     }
     $desktopExecutable = Join-Path $UnpackedDirectory 'EMT Studio.exe'
-    $process = Start-Process `
-        -FilePath $desktopExecutable `
-        -WorkingDirectory $UnpackedDirectory `
-        -WindowStyle Hidden `
-        -RedirectStandardOutput $standardOutput `
-        -RedirectStandardError $standardError `
-        -Environment $processEnvironment `
-        -PassThru
+    $smokeProcesses = @(1, 2 | ForEach-Object {
+        $instance = $_
+        $standardOutput = Join-Path $smokeRoot "desktop-$instance.stdout.log"
+        $standardError = Join-Path $smokeRoot "desktop-$instance.stderr.log"
+        $process = Start-Process `
+            -FilePath $desktopExecutable `
+            -WorkingDirectory $UnpackedDirectory `
+            -WindowStyle Hidden `
+            -RedirectStandardOutput $standardOutput `
+            -RedirectStandardError $standardError `
+            -Environment $processEnvironment `
+            -PassThru
+        [pscustomobject]@{
+            Instance = $instance
+            Process = $process
+            StandardOutput = $standardOutput
+            StandardError = $standardError
+        }
+    })
 
     try {
-        if (-not $process.WaitForExit(60000)) {
-            throw 'Packaged desktop smoke test did not finish within 60 seconds.'
+        $apiAddresses = foreach ($item in $smokeProcesses) {
+            if (-not $item.Process.WaitForExit(60000)) {
+                throw "Packaged desktop instance $($item.Instance) did not finish within 60 seconds."
+            }
+            if ($item.Process.ExitCode -ne 0) {
+                $errorText = if (Test-Path -LiteralPath $item.StandardError) {
+                    Get-Content -LiteralPath $item.StandardError -Raw
+                } else { '' }
+                throw "Packaged desktop instance $($item.Instance) exited with code $($item.Process.ExitCode). $errorText"
+            }
+            $outputText = [string](Get-Content -LiteralPath $item.StandardOutput -Raw)
+            if ($outputText -notmatch 'Renderer host bridge: desktop') {
+                throw "Packaged desktop instance $($item.Instance) exited without confirming the renderer bridge."
+            }
+            $readyMatch = [regex]::Match(
+                $outputText,
+                'EMT_API_READY=(http://127\.0\.0\.1:\d+)')
+            if (-not $readyMatch.Success) {
+                throw "Packaged desktop instance $($item.Instance) did not report a dynamic API address."
+            }
+            $readyMatch.Groups[1].Value
         }
-        if ($process.ExitCode -ne 0) {
-            $errorText = if (Test-Path -LiteralPath $standardError) {
-                Get-Content -LiteralPath $standardError -Raw
-            } else { '' }
-            throw "Packaged desktop exited with code $($process.ExitCode). $errorText"
-        }
-        $outputText = Get-Content -LiteralPath $standardOutput -Raw
-        if ($outputText -notmatch 'Renderer host bridge: desktop') {
-            throw 'Packaged desktop exited without confirming the renderer bridge.'
+        if (@($apiAddresses | Select-Object -Unique).Count -ne 2) {
+            throw 'Packaged desktop instances did not receive distinct API ports.'
         }
         $catalogPath = Join-Path $processEnvironment.EMT_USER_DATA_ROOT 'font-library\font_catalog.json'
         $catalog = Get-Content -LiteralPath $catalogPath -Raw | ConvertFrom-Json
@@ -250,11 +267,13 @@ function Test-PackagedDesktop {
         if ((Test-Path -LiteralPath $windowsYouYuan) -and -not (@($catalog.fonts) | Where-Object displayName -eq '幼圆')) {
             throw 'Packaged desktop did not import the available Windows YouYuan font.'
         }
-        Write-Host 'Packaged Electron desktop smoke test passed.'
+        Write-Host "Packaged Electron multi-instance smoke test passed: $($apiAddresses -join ', ')"
     }
     finally {
-        if (-not $process.HasExited) {
-            & taskkill.exe /pid $process.Id /t /f | Out-Null
+        foreach ($item in $smokeProcesses) {
+            if (-not $item.Process.HasExited) {
+                & taskkill.exe /pid $item.Process.Id /t /f | Out-Null
+            }
         }
     }
 }

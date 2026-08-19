@@ -1,6 +1,7 @@
 export interface EmtDesktopHost {
   kind: 'desktop'
   platform: string
+  apiBaseUrl: string
   versions: Record<string, string>
   selectImportFolder: () => Promise<HostPathGrant | null>
   selectImportPdf: () => Promise<HostPathGrant | null>
