@@ -1,0 +1,20 @@
+<Project>
+  <PropertyGroup>
+    <EffectiveRuntimeIdentifier Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</EffectiveRuntimeIdentifier>
+    <EffectiveRuntimeIdentifier Condition="'$(EffectiveRuntimeIdentifier)' == ''">$(NETCoreSdkRuntimeIdentifier)</EffectiveRuntimeIdentifier>
+    <OpenCvSharpRuntimePackage Condition="$([System.String]::Copy('$(EffectiveRuntimeIdentifier)').StartsWith('win-'))">OpenCvSharp4.runtime.win</OpenCvSharpRuntimePackage>
+    <OpenCvSharpRuntimePackage Condition="'$(EffectiveRuntimeIdentifier)' == 'linux-x64'">OpenCvSharp4.official.runtime.linux-x64</OpenCvSharpRuntimePackage>
+    <OpenCvSharpRuntimePackage Condition="'$(EffectiveRuntimeIdentifier)' == 'linux-arm64'">OpenCvSharp4.runtime.linux-arm64</OpenCvSharpRuntimePackage>
+    <OpenCvSharpRuntimePackage Condition="'$(EffectiveRuntimeIdentifier)' == 'osx-x64'">OpenCvSharp4.runtime.osx.x64</OpenCvSharpRuntimePackage>
+    <OpenCvSharpRuntimePackage Condition="'$(EffectiveRuntimeIdentifier)' == 'osx-arm64'">OpenCvSharp4.runtime.osx.arm64</OpenCvSharpRuntimePackage>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(OpenCvSharpRuntimePackage)' != ''">
+    <PackageReference Include="$(OpenCvSharpRuntimePackage)" />
+  </ItemGroup>
+
+  <Target Name="ValidateOpenCvSharpRuntime" BeforeTargets="CollectPackageReferences"
+          Condition="'$(OpenCvSharpRuntimePackage)' == ''">
+    <Error Text="No OpenCvSharp runtime package is configured for $(EffectiveRuntimeIdentifier). Set RuntimeIdentifier to a supported RID." />
+  </Target>
+</Project>

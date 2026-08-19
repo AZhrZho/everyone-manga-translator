@@ -1,0 +1,44 @@
+# Build output
+bin/
+obj/
+[Bb]uild/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+
+# Test output
+TestResults/
+coverage/
+.artifacts/
+.codex-test-output/
+*.trx
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# JavaScript build output
+node_modules/
+dist/
+.vite/
+apps/emt-client/public/ort/
+
+# Local secrets and generated runs
+appsettings.Development.json
+.env
+.env.*
+!.env.example
+precheck-runs/
+*.http
+*.log
+
+# Local managed font library. It may contain licensed system-font copies.
+resources/font-library/
+
+# Local manga source material. Keep test books outside the source baseline.
+resources/books/
+
+# Local detector weights. They are installed separately and are not source artifacts.
+resources/models/

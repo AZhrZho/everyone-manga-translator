@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\MangaTranslator.Contracts\MangaTranslator.Contracts.csproj" />
+    <ProjectReference Include="..\..\packages\MangaTranslator.ProjectSystem\MangaTranslator.ProjectSystem.csproj" />
+    <ProjectReference Include="..\..\packages\MangaTranslator.ProjectSystem.Local\MangaTranslator.ProjectSystem.Local.csproj" />
+    <ProjectReference Include="..\..\packages\MangaTranslator.Cleaning.Abstractions\MangaTranslator.Cleaning.Abstractions.csproj" />
+    <ProjectReference Include="..\..\packages\MangaTranslator.Cleaning\MangaTranslator.Cleaning.csproj" />
+    <ProjectReference Include="..\..\packages\MangaTranslator.Dialogue\MangaTranslator.Dialogue.csproj" />
+    <ProjectReference Include="..\..\packages\MangaTranslator.FontReference.FileSystem\MangaTranslator.FontReference.FileSystem.csproj" />
+    <ProjectReference Include="..\..\packages\MangaTranslator.LocalDetection.Craft\MangaTranslator.LocalDetection.Craft.csproj" />
+    <ProjectReference Include="..\..\packages\MangaTranslator.LocalDetection.Ctd\MangaTranslator.LocalDetection.Ctd.csproj" />
+    <ProjectReference Include="..\..\packages\MangaTranslator.ModelProvider.OpenAI\MangaTranslator.ModelProvider.OpenAI.csproj" />
+    <ProjectReference Include="..\..\packages\MangaTranslator.ModelProvider.Anthropic\MangaTranslator.ModelProvider.Anthropic.csproj" />
+    <ProjectReference Include="..\..\packages\MangaTranslator.Precheck\MangaTranslator.Precheck.csproj" />
+    <ProjectReference Include="..\..\packages\MangaTranslator.Rendering\MangaTranslator.Rendering.csproj" />
+    <ProjectReference Include="..\..\tools\MangaTranslator.FontManager\MangaTranslator.FontManager.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" />
+  </ItemGroup>
+
+</Project>

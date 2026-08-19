@@ -1,0 +1,72 @@
+{
+  "name": "emt-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Desktop-first manga translation workspace",
+  "author": "EMT Studio contributors",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "main.mjs",
+  "scripts": {
+    "bootstrap": "node scripts/bootstrap.mjs",
+    "dev": "concurrently -k \"npm --prefix ../emt-client run dev -- --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron .\"",
+    "dist:win": "electron-builder --win nsis --x64 --publish never",
+    "install:electron": "node scripts/install-electron.mjs",
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "concurrently": "10.0.4",
+    "electron": "43.3.0",
+    "electron-builder": "26.15.3",
+    "wait-on": "9.1.0"
+  },
+  "build": {
+    "appId": "studio.emt.desktop",
+    "productName": "EMT Studio",
+    "artifactName": "EMT-Studio-${version}-Windows-${arch}-Setup.${ext}",
+    "asar": true,
+    "compression": "maximum",
+    "npmRebuild": false,
+    "directories": {
+      "output": "../../artifacts/windows"
+    },
+    "files": [
+      "main.mjs",
+      "preload.cjs",
+      "emt-logo.png",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../../LICENSE",
+        "to": "LICENSE"
+      },
+      {
+        "from": "../../build/windows-release/api",
+        "to": "api"
+      },
+      {
+        "from": "../../build/windows-release/models",
+        "to": "models"
+      }
+    ],
+    "win": {
+      "icon": "emt-logo.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "EMT Studio"
+    }
+  }
+}

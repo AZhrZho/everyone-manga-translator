@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "models": [
+    {
+      "id": "craft",
+      "fileName": "craft.onnx",
+      "upstreamRepository": "https://github.com/clovaai/CRAFT-pytorch",
+      "artifactRepository": "https://huggingface.co/KvaytG/craft-mlt-25k-onnx",
+      "sourceRevision": "88ee1e402f4cca66ccd1d1c7f2e29511a79cc6fe",
+      "downloadUrl": "https://huggingface.co/KvaytG/craft-mlt-25k-onnx/resolve/88ee1e402f4cca66ccd1d1c7f2e29511a79cc6fe/craft.onnx",
+      "sizeBytes": 83179177,
+      "sha256": "f69ff10b3fd19126738b2ff7322285a59ba92571bb603dfbeb61a0dc03aa536e",
+      "licenseNote": "Converted CRAFT ONNX artifact. See packages/MangaTranslator.LocalDetection.Craft/NOTICE.md before distribution."
+    },
+    {
+      "id": "ctd",
+      "fileName": "comictextdetector.pt.onnx",
+      "upstreamRepository": "https://github.com/zyddnys/manga-image-translator",
+      "artifactRepository": "https://github.com/zyddnys/manga-image-translator/releases/tag/beta-0.3",
+      "sourceRevision": "beta-0.3",
+      "downloadUrl": "https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.3/comictextdetector.pt.onnx",
+      "sizeBytes": 94669756,
+      "sha256": "1a86ace74961413cbd650002e7bb4dcec4980ffa21b2f19b86933372071d718f",
+      "licenseNote": "Upstream manga-image-translator artifact; GPL-3.0 obligations apply. See packages/MangaTranslator.LocalDetection.Ctd/NOTICE.md."
+    }
+  ]
+}

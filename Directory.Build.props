@@ -1,0 +1,5 @@
+<Project>
+  <PropertyGroup>
+    <PackageLicenseExpression Condition="'$(PackageLicenseExpression)' == ''">AGPL-3.0-only</PackageLicenseExpression>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/apps/">
+    <Project Path="MangaTranslator.Contracts/MangaTranslator.Contracts.csproj" />
+    <Project Path="MangaTranslator.Api/MangaTranslator.Api.csproj" />
+  </Folder>
+  <Folder Name="/packages/">
+    <Project Path="../packages/MangaTranslator.ProjectSystem/MangaTranslator.ProjectSystem.csproj" />
+    <Project Path="../packages/MangaTranslator.ProjectSystem.Local/MangaTranslator.ProjectSystem.Local.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\MangaTranslator.LocalDetection.Abstractions\MangaTranslator.LocalDetection.Abstractions.csproj" />
+    <ProjectReference Include="..\MangaTranslator.ModelProvider.Abstractions\MangaTranslator.ModelProvider.Abstractions.csproj" />
+    <ProjectReference Include="..\MangaTranslator.Precheck\MangaTranslator.Precheck.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14.0</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+  </PropertyGroup>
+
+</Project>

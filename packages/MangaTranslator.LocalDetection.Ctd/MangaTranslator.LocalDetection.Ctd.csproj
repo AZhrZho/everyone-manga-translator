@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Description>Cross-platform .NET port of Comic-Text-Detector (CTD) text detection and mask generation.</Description>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" />
+    <PackageReference Include="OpenCvSharp4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MangaTranslator.LocalDetection.Abstractions\MangaTranslator.LocalDetection.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="NOTICE.md" Pack="true" PackagePath="" />
+    <None Include="README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+</Project>

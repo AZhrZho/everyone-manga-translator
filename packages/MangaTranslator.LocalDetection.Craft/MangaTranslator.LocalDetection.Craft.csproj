@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14.0</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <Description>CRAFT ONNX text detection and clean-room mask synthesis proof of concept.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" />
+    <PackageReference Include="OpenCvSharp4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MangaTranslator.LocalDetection.Abstractions\MangaTranslator.LocalDetection.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="NOTICE.md" Pack="true" PackagePath="" />
+    <None Include="README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+  <Import Project="..\..\eng\OpenCvSharp.Runtime.props" />
+
+</Project>

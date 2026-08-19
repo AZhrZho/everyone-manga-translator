@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "libraryRevision": 1,
+  "nextFontNumber": 3,
+  "updatedAtUtc": "2026-08-19T00:00:00Z",
+  "fonts": [
+    {
+      "fontId": "F0002",
+      "displayName": "快乐体",
+      "familyName": "ZCOOL KuaiLe",
+      "category": "简体中文展示字体",
+      "tags": [
+        "zh-Hans",
+        "display",
+        "playful"
+      ],
+      "source": {
+        "kind": "bundled",
+        "reference": "https://github.com/google/fonts/tree/main/ofl/zcoolkuaile",
+        "licenseNote": "SIL Open Font License 1.1",
+        "licenseRelativePath": "fonts/F0002/LICENSE.txt",
+        "licenseSha256": "538078469839b4a2e7ad22bef4ebe41681a4e53749bb2a072144024f1d6d703d"
+      },
+      "addedAtUtc": "2026-08-19T00:00:00Z",
+      "regular": {
+        "relativePath": "fonts/F0002/regular.ttf",
+        "originalFileName": "ZCOOLKuaiLe-Regular.ttf",
+        "faceIndex": 0,
+        "sha256": "812a6fc1fe54b6d73a419245c32dfeba8aa33104d5be90d1cf6af082007cb71d",
+        "detectedFamilyName": "ZCOOL KuaiLe",
+        "detectedWeight": 400,
+        "detectedSlant": "Upright"
+      },
+      "bold": null,
+      "italic": null
+    }
+  ],
+  "latestSample": null
+}

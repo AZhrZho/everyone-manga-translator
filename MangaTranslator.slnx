@@ -1,0 +1,43 @@
+<Solution>
+  <Folder Name="/apps/">
+    <Project Path="apps/MangaTranslator.Api/MangaTranslator.Api.csproj" />
+    <Project Path="apps/MangaTranslator.Contracts/MangaTranslator.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/packages/">
+    <Project Path="packages/MangaTranslator.ModelProvider.Abstractions/MangaTranslator.ModelProvider.Abstractions.csproj" />
+    <Project Path="packages/MangaTranslator.ModelProvider.OpenAI/MangaTranslator.ModelProvider.OpenAI.csproj" />
+    <Project Path="packages/MangaTranslator.ModelProvider.Anthropic/MangaTranslator.ModelProvider.Anthropic.csproj" />
+    <Project Path="packages/MangaTranslator.Precheck/MangaTranslator.Precheck.csproj" />
+    <Project Path="packages/MangaTranslator.Dialogue/MangaTranslator.Dialogue.csproj" />
+    <Project Path="packages/MangaTranslator.Rendering/MangaTranslator.Rendering.csproj" />
+    <Project Path="packages/MangaTranslator.FontReference.FileSystem/MangaTranslator.FontReference.FileSystem.csproj" />
+    <Project Path="packages/MangaTranslator.LocalDetection.Abstractions/MangaTranslator.LocalDetection.Abstractions.csproj" />
+    <Project Path="packages/MangaTranslator.LocalDetection.Craft/MangaTranslator.LocalDetection.Craft.csproj" />
+    <Project Path="packages/MangaTranslator.LocalDetection/MangaTranslator.LocalDetection.csproj" />
+    <Project Path="packages/MangaTranslator.LocalDetection.Ctd/MangaTranslator.LocalDetection.Ctd.csproj" />
+    <Project Path="packages/MangaTranslator.Cleaning.Abstractions/MangaTranslator.Cleaning.Abstractions.csproj" />
+    <Project Path="packages/MangaTranslator.Cleaning/MangaTranslator.Cleaning.csproj" />
+    <Project Path="packages/MangaTranslator.ProjectSystem/MangaTranslator.ProjectSystem.csproj" />
+    <Project Path="packages/MangaTranslator.ProjectSystem.Local/MangaTranslator.ProjectSystem.Local.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MangaTranslator.Api.Tests/MangaTranslator.Api.Tests.csproj" />
+    <Project Path="tests/MangaTranslator.FontManager.Tests/MangaTranslator.FontManager.Tests.csproj" />
+    <Project Path="tests/MangaTranslator.ModelProvider.OpenAI.Tests/MangaTranslator.ModelProvider.OpenAI.Tests.csproj" />
+    <Project Path="tests/MangaTranslator.Precheck.Tests/MangaTranslator.Precheck.Tests.csproj" />
+    <Project Path="tests/MangaTranslator.Dialogue.Tests/MangaTranslator.Dialogue.Tests.csproj" />
+    <Project Path="tests/MangaTranslator.Rendering.Tests/MangaTranslator.Rendering.Tests.csproj" />
+    <Project Path="tests/MangaTranslator.LocalDetection.Tests/MangaTranslator.LocalDetection.Tests.csproj" />
+    <Project Path="tests/MangaTranslator.LocalDetection.Craft.Tests/MangaTranslator.LocalDetection.Craft.Tests.csproj" />
+    <Project Path="tests/MangaTranslator.LocalDetection.Ctd.Tests/MangaTranslator.LocalDetection.Ctd.Tests.csproj" />
+    <Project Path="tests/MangaTranslator.Cleaning.Tests/MangaTranslator.Cleaning.Tests.csproj" />
+    <Project Path="tests/MangaTranslator.FontReference.FileSystem.Tests/MangaTranslator.FontReference.FileSystem.Tests.csproj" />
+    <Project Path="tests/MangaTranslator.Pipeline.Integration.Tests/MangaTranslator.Pipeline.Integration.Tests.csproj" />
+    <Project Path="tests/MangaTranslator.ProjectSystem.Local.Tests/MangaTranslator.ProjectSystem.Local.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/MangaTranslator.FontManager/MangaTranslator.FontManager.csproj" />
+    <Project Path="tools/MangaTranslator.FontManager.Cli/MangaTranslator.FontManager.Cli.csproj" />
+    <Project Path="tools/MangaTranslator.Precheck.Runner/MangaTranslator.Precheck.Runner.csproj" />
+  </Folder>
+</Solution>

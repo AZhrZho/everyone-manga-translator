@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14.0</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\packages\MangaTranslator.ModelProvider.Abstractions\MangaTranslator.ModelProvider.Abstractions.csproj" />
+    <ProjectReference Include="..\..\packages\MangaTranslator.ModelProvider.OpenAI\MangaTranslator.ModelProvider.OpenAI.csproj" />
+    <ProjectReference Include="..\..\packages\MangaTranslator.ModelProvider.Anthropic\MangaTranslator.ModelProvider.Anthropic.csproj" />
+  </ItemGroup>
+
+</Project>
