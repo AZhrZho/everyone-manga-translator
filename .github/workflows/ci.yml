@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            apps/emt-client/package-lock.json
+            apps/emt-desktop/package-lock.json
+      - name: Restore client dependencies
+        run: npm ci --prefix apps/emt-client
+      - name: Restore desktop dependencies
+        run: npm ci --prefix apps/emt-desktop
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Test .NET solution
+        run: dotnet test MangaTranslator.slnx --configuration Release
+      - name: Test client
+        run: npm --prefix apps/emt-client test
+      - name: Lint client
+        run: npm --prefix apps/emt-client run lint
+      - name: Build client
+        run: npm --prefix apps/emt-client run build
+      - name: Test desktop launcher
+        run: npm --prefix apps/emt-desktop test

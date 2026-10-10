@@ -304,6 +304,7 @@ if (-not $SkipTests) {
     Invoke-External $dotnet @('test', $solutionPath, '--configuration', 'Release', '--no-restore')
     Invoke-External $npm @('--prefix', $clientDirectory, 'test')
     Invoke-External $npm @('--prefix', $clientDirectory, 'run', 'lint')
+    Invoke-External $npm @('--prefix', $desktopDirectory, 'test')
 }
 
 Invoke-External $npm @('--prefix', $clientDirectory, 'run', 'build')
@@ -348,6 +349,23 @@ if ($installers.Count -ne 1) {
 }
 
 $installerHash = Get-FileHash -LiteralPath $installers[0].FullName -Algorithm SHA256
+$sourceCommit = (& git -C $workspaceRoot rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0) { throw 'Could not determine the source commit.' }
+$sourceStatus = @(& git -C $workspaceRoot status --porcelain)
+if ($LASTEXITCODE -ne 0) { throw 'Could not determine the source working tree status.' }
+$manifest = [ordered]@{
+    version = $version
+    sourceCommit = $sourceCommit
+    sourceDirty = $sourceStatus.Count -gt 0
+    builtAtUtc = [DateTime]::UtcNow.ToString('o')
+    testsPassed = -not [bool]$SkipTests
+    packagedApiSmokePassed = $true
+    packagedDesktopSmokePassed = $true
+    installer = $installers[0].Name
+    installerSizeBytes = $installers[0].Length
+    installerSha256 = $installerHash.Hash.ToLowerInvariant()
+}
+$manifest | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $artifactsDirectory 'release-manifest.json') -Encoding utf8
 Write-Host ''
 Write-Host "Windows installer: $($installers[0].FullName)"
 Write-Host "SHA-256: $($installerHash.Hash.ToLowerInvariant())"

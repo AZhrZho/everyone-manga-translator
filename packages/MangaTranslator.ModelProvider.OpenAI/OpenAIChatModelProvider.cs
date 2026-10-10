@@ -42,7 +42,6 @@ public sealed class OpenAIChatModelProvider : IModelProvider
         ValidateRequest(request);
         using var totalTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         totalTimeout.CancelAfter(request.Options.TotalTimeout ?? options.Timeouts.DefaultTotalTimeout);
-        using var httpRequest = CreateHttpRequest(request);
         var stopwatch = Stopwatch.StartNew();
 
         HttpResponseMessage? response = null;
@@ -50,10 +49,30 @@ public sealed class OpenAIChatModelProvider : IModelProvider
         var cancelledAtStartup = false;
         try
         {
+            using var httpRequest = CreateHttpRequest(request);
             response = await httpClient.SendAsync(
                 httpRequest,
                 HttpCompletionOption.ResponseHeadersRead,
                 totalTimeout.Token).ConfigureAwait(false);
+
+            if (response.StatusCode == HttpStatusCode.BadRequest
+                && request.Options.PromptCacheRetention is not null)
+            {
+                var errorBody = await response.Content
+                    .ReadAsStringAsync(totalTimeout.Token)
+                    .ConfigureAwait(false);
+                if (IsUnsupportedPromptCacheRetention(errorBody))
+                {
+                    response.Dispose();
+                    using var compatibilityRequest = CreateHttpRequest(
+                        request,
+                        includePromptCacheRetention: false);
+                    response = await httpClient.SendAsync(
+                        compatibilityRequest,
+                        HttpCompletionOption.ResponseHeadersRead,
+                        totalTimeout.Token).ConfigureAwait(false);
+                }
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -69,11 +88,13 @@ public sealed class OpenAIChatModelProvider : IModelProvider
         }
         if (cancelledAtStartup)
         {
+            response?.Dispose();
             yield return new ResponseCancelled();
             yield break;
         }
         if (startupError is not null)
         {
+            response?.Dispose();
             yield return new ResponseFailed(startupError);
             yield break;
         }
@@ -226,16 +247,23 @@ public sealed class OpenAIChatModelProvider : IModelProvider
         }
     }
 
-    private HttpRequestMessage CreateHttpRequest(ModelRequest request)
+    private HttpRequestMessage CreateHttpRequest(
+        ModelRequest request,
+        bool includePromptCacheRetention = true)
     {
         var message = new HttpRequestMessage(HttpMethod.Post, options.Endpoint);
         message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.ApiKey);
         message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
-        message.Content = new StringContent(BuildRequestBody(request).ToJsonString(), Encoding.UTF8, "application/json");
+        message.Content = new StringContent(
+            BuildRequestBody(request, includePromptCacheRetention).ToJsonString(),
+            Encoding.UTF8,
+            "application/json");
         return message;
     }
 
-    private JsonObject BuildRequestBody(ModelRequest request)
+    private JsonObject BuildRequestBody(
+        ModelRequest request,
+        bool includePromptCacheRetention = true)
     {
         var messages = new JsonArray();
         foreach (var modelMessage in request.Messages)
@@ -268,7 +296,8 @@ public sealed class OpenAIChatModelProvider : IModelProvider
         if (request.Options.MaxOutputTokens is { } maxTokens) root["max_completion_tokens"] = maxTokens;
         if (!string.IsNullOrWhiteSpace(request.Options.ReasoningEffort)) root["reasoning_effort"] = request.Options.ReasoningEffort;
         if (request.Options.PromptCacheKey is { } cacheKey) root["prompt_cache_key"] = cacheKey;
-        if (request.Options.PromptCacheRetention is { } retention)
+        if (includePromptCacheRetention
+            && request.Options.PromptCacheRetention is { } retention)
         {
             root["prompt_cache_retention"] = retention == PromptCacheRetention.TwentyFourHours ? "24h" : "in_memory";
         }
@@ -280,6 +309,10 @@ public sealed class OpenAIChatModelProvider : IModelProvider
         }
         return root;
     }
+
+    private static bool IsUnsupportedPromptCacheRetention(string errorBody) =>
+        errorBody.Contains("prompt_cache_retention", StringComparison.OrdinalIgnoreCase)
+        && errorBody.Contains("unsupported", StringComparison.OrdinalIgnoreCase);
 
     private static JsonObject MapContent(ModelContent content) => content switch
     {

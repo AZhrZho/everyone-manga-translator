@@ -155,6 +155,32 @@ public sealed class OpenAIModelProviderTests
     }
 
     [Fact]
+    public async Task StreamAsyncRetriesWithoutUnsupportedPromptCacheRetention()
+    {
+        var handler = new UnsupportedPromptCacheRetentionHandler();
+        using var httpClient = new HttpClient(handler);
+        var provider = new OpenAIModelProvider(
+            httpClient,
+            new OpenAIModelProviderOptions { ApiKey = "test-key" });
+        var request = new ModelRequest(
+            "gpt-5.4",
+            [new ModelMessage(ModelRole.User, "translate this page")],
+            options: new ModelGenerationOptions
+            {
+                PromptCacheKey = "book-sample:zh-Hans:semantic-v3",
+                PromptCacheRetention = PromptCacheRetention.TwentyFourHours
+            });
+
+        var events = await CollectAsync(provider.StreamAsync(request));
+
+        Assert.Equal(2, handler.RequestBodies.Count);
+        Assert.Contains("prompt_cache_retention", handler.RequestBodies[0], StringComparison.Ordinal);
+        Assert.DoesNotContain("prompt_cache_retention", handler.RequestBodies[1], StringComparison.Ordinal);
+        Assert.Contains("prompt_cache_key", handler.RequestBodies[1], StringComparison.Ordinal);
+        Assert.Contains(events, item => item is ResponseCompleted);
+    }
+
+    [Fact]
     public async Task StreamAsyncReportsInterruptedStreamWhenCompletionEventIsMissing()
     {
         using var httpClient = new HttpClient(new IncompleteStreamHandler());
@@ -268,6 +294,38 @@ public sealed class OpenAIModelProviderTests
             response.Content.Headers.ContentType = new MediaTypeHeaderValue("text/event-stream");
             response.Headers.TryAddWithoutValidation("x-request-id", "req_test");
             return response;
+        }
+    }
+
+    private sealed class UnsupportedPromptCacheRetentionHandler : HttpMessageHandler
+    {
+        public List<string> RequestBodies { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            RequestBodies.Add(await request.Content!.ReadAsStringAsync(cancellationToken));
+            if (RequestBodies.Count == 1)
+            {
+                return new HttpResponseMessage(HttpStatusCode.BadRequest)
+                {
+                    Content = new StringContent(
+                        "{\"detail\":\"Unsupported parameter: prompt_cache_retention\"}",
+                        Encoding.UTF8,
+                        "application/json")
+                };
+            }
+
+            const string stream =
+                "event: response.created\n" +
+                "data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_test\"}}\n\n" +
+                "event: response.completed\n" +
+                "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_test\",\"status\":\"completed\"}}\n\n";
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(stream, Encoding.UTF8, "text/event-stream")
+            };
         }
     }
 

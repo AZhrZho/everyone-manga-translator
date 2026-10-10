@@ -1,7 +1,7 @@
 {
   "name": "emt-desktop",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Desktop-first manga translation workspace",
   "author": "EMT Studio contributors",
   "license": "AGPL-3.0-only",

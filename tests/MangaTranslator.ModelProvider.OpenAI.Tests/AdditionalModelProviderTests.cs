@@ -37,6 +37,33 @@ public sealed class AdditionalModelProviderTests
     }
 
     [Fact]
+    public async Task OpenAIChatRetriesWithoutUnsupportedPromptCacheRetention()
+    {
+        var handler = new OpenAIChatHandler(rejectPromptCacheRetention: true);
+        using var client = new HttpClient(handler);
+        var provider = new OpenAIChatModelProvider(client, new OpenAIChatModelProviderOptions
+        {
+            ApiKey = "test-key",
+            Endpoint = new Uri("https://example.test/v1/chat/completions")
+        });
+
+        var events = await CollectAsync(provider.StreamAsync(new ModelRequest(
+            "gpt-4o",
+            [new ModelMessage(ModelRole.User, "translate")],
+            options: new ModelGenerationOptions
+            {
+                PromptCacheKey = "book-key",
+                PromptCacheRetention = PromptCacheRetention.TwentyFourHours
+            })));
+
+        Assert.Equal(2, handler.Bodies.Count);
+        Assert.Contains("prompt_cache_retention", handler.Bodies[0], StringComparison.Ordinal);
+        Assert.DoesNotContain("prompt_cache_retention", handler.Bodies[1], StringComparison.Ordinal);
+        Assert.Contains("prompt_cache_key", handler.Bodies[1], StringComparison.Ordinal);
+        Assert.Contains(events, item => item is ResponseCompleted);
+    }
+
+    [Fact]
     public async Task AnthropicMapsStreamAndNativeMessagesRequest()
     {
         var handler = new AnthropicHandler();
@@ -73,15 +100,27 @@ public sealed class AdditionalModelProviderTests
         return result;
     }
 
-    private sealed class OpenAIChatHandler : HttpMessageHandler
+    private sealed class OpenAIChatHandler(bool rejectPromptCacheRetention = false) : HttpMessageHandler
     {
         public string Body { get; private set; } = string.Empty;
+        public List<string> Bodies { get; } = [];
         public string? Authorization { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Body = await request.Content!.ReadAsStringAsync(cancellationToken);
+            Bodies.Add(Body);
             Authorization = request.Headers.Authorization?.ToString();
+            if (rejectPromptCacheRetention && Bodies.Count == 1)
+            {
+                return new HttpResponseMessage(HttpStatusCode.BadRequest)
+                {
+                    Content = new StringContent(
+                        "{\"detail\":\"Unsupported parameter: prompt_cache_retention\"}",
+                        Encoding.UTF8,
+                        "application/json")
+                };
+            }
             const string stream =
                 "data: {\"id\":\"chatcmpl_test\",\"choices\":[{\"delta\":{\"content\":\"{\\\"ok\\\":true}\"},\"finish_reason\":null}]}\n\n" +
                 "data: {\"id\":\"chatcmpl_test\",\"choices\":[],\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":4,\"total_tokens\":14}}\n\n" +

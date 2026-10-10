@@ -47,7 +47,6 @@ public sealed class OpenAIModelProvider : IModelProvider
         totalTimeoutSource.CancelAfter(
             request.Options.TotalTimeout ?? _options.Timeouts.DefaultTotalTimeout);
 
-        using var httpRequest = CreateHttpRequest(request);
         var stopwatch = Stopwatch.StartNew();
 
         HttpResponseMessage? httpResponse = null;
@@ -55,10 +54,30 @@ public sealed class OpenAIModelProvider : IModelProvider
 
         try
         {
+            using var httpRequest = CreateHttpRequest(request);
             httpResponse = await _httpClient.SendAsync(
                 httpRequest,
                 HttpCompletionOption.ResponseHeadersRead,
                 totalTimeoutSource.Token).ConfigureAwait(false);
+
+            if (httpResponse.StatusCode == HttpStatusCode.BadRequest
+                && request.Options.PromptCacheRetention is not null)
+            {
+                var errorBody = await httpResponse.Content
+                    .ReadAsStringAsync(totalTimeoutSource.Token)
+                    .ConfigureAwait(false);
+                if (IsUnsupportedPromptCacheRetention(errorBody))
+                {
+                    httpResponse.Dispose();
+                    using var compatibilityRequest = CreateHttpRequest(
+                        request,
+                        includePromptCacheRetention: false);
+                    httpResponse = await _httpClient.SendAsync(
+                        compatibilityRequest,
+                        HttpCompletionOption.ResponseHeadersRead,
+                        totalTimeoutSource.Token).ConfigureAwait(false);
+                }
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -78,6 +97,7 @@ public sealed class OpenAIModelProvider : IModelProvider
 
         if (startupError is not null)
         {
+            httpResponse?.Dispose();
             if (startupError.Code == "cancelled")
             {
                 yield return new ResponseCancelled();
@@ -254,7 +274,9 @@ public sealed class OpenAIModelProvider : IModelProvider
         }
     }
 
-    private HttpRequestMessage CreateHttpRequest(ModelRequest request)
+    private HttpRequestMessage CreateHttpRequest(
+        ModelRequest request,
+        bool includePromptCacheRetention = true)
     {
         var message = new HttpRequestMessage(HttpMethod.Post, _options.Endpoint);
         message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
@@ -271,14 +293,16 @@ public sealed class OpenAIModelProvider : IModelProvider
         }
 
         message.Content = new StringContent(
-            BuildRequestBody(request).ToJsonString(),
+            BuildRequestBody(request, includePromptCacheRetention).ToJsonString(),
             Encoding.UTF8,
             "application/json");
 
         return message;
     }
 
-    private JsonObject BuildRequestBody(ModelRequest request)
+    private JsonObject BuildRequestBody(
+        ModelRequest request,
+        bool includePromptCacheRetention = true)
     {
         var input = new JsonArray();
         foreach (var modelMessage in request.Messages)
@@ -335,7 +359,8 @@ public sealed class OpenAIModelProvider : IModelProvider
             root["prompt_cache_key"] = promptCacheKey;
         }
 
-        if (request.Options.PromptCacheRetention is { } promptCacheRetention)
+        if (includePromptCacheRetention
+            && request.Options.PromptCacheRetention is { } promptCacheRetention)
         {
             root["prompt_cache_retention"] = MapPromptCacheRetention(
                 promptCacheRetention);
@@ -354,6 +379,10 @@ public sealed class OpenAIModelProvider : IModelProvider
 
         return root;
     }
+
+    private static bool IsUnsupportedPromptCacheRetention(string errorBody) =>
+        errorBody.Contains("prompt_cache_retention", StringComparison.OrdinalIgnoreCase)
+        && errorBody.Contains("unsupported", StringComparison.OrdinalIgnoreCase);
 
     private static JsonObject MapContent(ModelRole role, ModelContent content)
     {

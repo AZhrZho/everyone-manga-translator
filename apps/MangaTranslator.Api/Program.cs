@@ -142,7 +142,7 @@ app.MapGet("/api/system/info", (IHostEnvironment environment, AppDataPaths paths
 
     return new SystemInfoResponse(
         "EMT Studio",
-        typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "0.1.1",
+        typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "0.1.2",
         hostKind,
         Environment.Version.ToString(),
         paths.DataRoot);
